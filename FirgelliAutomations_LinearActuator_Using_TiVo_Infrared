@@ -1,0 +1,149 @@
+/*
+ * File:          FirgelliAutomations_LinearActuator_Using_TiVo_Infrared
+ * Written by:    Richard Bagdonas
+ *                Twitter: @richardbagdonas
+ * Date:          8/21/2016
+ */
+//Hook up the IRremote library
+#include <IRremote.h>
+
+//define the switch ports
+int nSwitchUp           = 9;
+int nSwitchDown         = 8;
+
+//define the two buttons we will use to control the relays
+const int nButtonUp     = 6151;
+const int nButtonDown   = 22535;
+
+//setup the timer object we will use to manage the time from when the button is no longer pressed until the relay switches off
+int nTimer              = 0;
+
+//set the variable that tels us when we need to pay attention to the button clicks
+bool bSwitchOn          = false;
+
+//the output will be to pin 11 on the arduino
+int nReceiverPin        = 11;
+
+//initialize the receiver on the ir program
+IRrecv receiver(nReceiverPin);
+
+//setup the variable that will store our resulting codes
+decode_results oResults;
+
+//setup the variable that will store our last known code for holding the button down
+int nLastCode           = 0;
+
+void setup()
+{
+  //setup our serial output to 9600 baud
+  Serial.begin(9600);
+  
+  //set up the pins for the up and down switches
+  pinMode(nSwitchUp, OUTPUT);
+  pinMode(nSwitchDown, OUTPUT);
+  
+  //start the infrared receiver
+  receiver.enableIRIn();
+}
+
+// loop() constantly checks for any received IR codes.
+void loop() 
+{
+  //do we have results?
+  //yes
+  if (receiver.decode(&oResults)) 
+  {
+    //reset our timer object to 0
+    nTimer              = 0;
+    
+    //read the received infrared code into a 16-bit variable
+    uint16_t nResult    = (oResults.value & 0xFFFF);
+
+    Serial.println(nResult);
+
+    //is this the button being held (we get the 0xFFFFFFF when it is held)?
+    //yes
+    if (nResult == 0xFFFF)
+    {
+      //set the result the same so that it continues operating
+      nResult           = nLastCode;
+    }
+    //is this the button being held?
+    //no
+    else
+    {
+      //set the last code to our new value
+      nLastCode         = nResult;
+    }
+
+    //identify if we know this code
+    switch (nResult)
+    {
+      //button going up (green thumb)
+      case nButtonUp:
+        Serial.println("UP");
+        //turn off the down switch
+        digitalWrite(nSwitchDown, LOW);
+        //wait 100 milliseconds
+        delay(100);
+        //turn on the up switch
+        digitalWrite(nSwitchUp, HIGH);
+        //set our flag to allow the timer to be used
+        bSwitchOn       = true;
+        break;
+        
+      //button going down (red thumb)
+      case nButtonDown:
+        Serial.println("DOWN");
+        //turn off the up switch
+        digitalWrite(nSwitchUp, LOW);
+        //wait 100 milliseconds
+        delay(100);
+        //turn on the down switch
+        digitalWrite(nSwitchDown, HIGH);
+        //set our flag to allow the timer to be used
+        bSwitchOn       = true;
+        break;
+
+      //another button was pushed (uncomment the print line if you need to know what its code is)
+      default:
+        //Serial.println(resultCode);
+        break;        
+    }
+    
+    //wait for the next button value
+    receiver.resume();
+  }
+  //do we have results?
+  //no
+  else
+  {
+    //are we now processing the timer now?
+    //yes
+    if (bSwitchOn == true)
+    {
+      //print out the current timer value
+      Serial.println(nTimer);
+      
+      //45 is the perfect time to have it turn off the relay
+      //has it reached 45 yet?
+      //yes
+      if (nTimer > 45)
+      {    
+        //turn them both off
+        digitalWrite(nSwitchUp, LOW);
+        digitalWrite(nSwitchDown, LOW);
+        
+        //set the flag for using the timer to off
+        bSwitchOn     = false;
+      }
+      //has it reached 90 yet?
+      //no
+      else
+      {
+        //increment the timer value
+        nTimer        ++;
+      }
+    }
+  }
+}
