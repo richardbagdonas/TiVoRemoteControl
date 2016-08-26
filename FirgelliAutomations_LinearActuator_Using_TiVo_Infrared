@@ -137,7 +137,7 @@ void loop()
         //set the flag for using the timer to off
         bSwitchOn     = false;
       }
-      //has it reached 90 yet?
+      //has it reached 45 yet?
       //no
       else
       {
